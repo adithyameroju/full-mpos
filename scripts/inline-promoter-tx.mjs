@@ -1,0 +1,10 @@
+import fs from "fs";
+const path = "src/App.jsx";
+let s = fs.readFileSync(path, "utf8");
+const start = s.indexOf("const TXN_STATUS_BADGE={Available:");
+const end = s.indexOf("function DealerTransactionsSection({config}){");
+if (start === -1 || end === -1) throw new Error("markers not found");
+const before = s.slice(0, start);
+const after = s.slice(end);
+const newBlock = fs.readFileSync("src/promoterTransactionsSection.impl.txt", "utf8");
+fs.writeFileSync(path, before + newBlock + after);

@@ -1,0 +1,3 @@
+######
+When adding icons to the UI, always use the lucide-react library. Ensure icons are imported individually like import { Settings, LogOut } from 'lucide-react';. Use a default size of 20px unless specified otherwise.
+######

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="520" viewBox="0 0 800 520" fill="none">
+  <defs>
+    <linearGradient id="sky" x1="400" y1="0" x2="400" y2="520" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#C8E6D8"/>
+      <stop offset="0.6" stop-color="#E8F4EC"/>
+      <stop offset="1" stop-color="#DDE8E0"/>
+    </linearGradient>
+    <linearGradient id="body" x1="260" y1="280" x2="560" y2="360" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1a7a4a"/>
+      <stop offset="1" stop-color="#0d4d2f"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="520" rx="24" fill="url(#sky)"/>
+  <ellipse cx="400" cy="420" rx="280" ry="40" fill="#000" opacity="0.08"/>
+  <path d="M220 380 L220 300 L320 280 L380 260 L420 240 L480 260 L520 280 L560 300 L580 300 L580 360 L520 380 L480 360 L440 360 L420 380 L360 380 L320 360 L280 380 Z" fill="url(#body)"/>
+  <rect x="260" y="240" width="200" height="80" rx="8" fill="#145a38"/>
+  <circle cx="300" cy="380" r="28" fill="#1f2937"/>
+  <circle cx="300" cy="380" r="16" fill="#4b5563"/>
+  <circle cx="500" cy="380" r="28" fill="#1f2937"/>
+  <circle cx="500" cy="380" r="16" fill="#4b5563"/>
+  <path d="M420 240 L460 200 L500 220" stroke="#145a38" stroke-width="12" stroke-linecap="round"/>
+  <rect x="460" y="200" width="24" height="48" rx="6" fill="#0d4d2f"/>
+</svg>

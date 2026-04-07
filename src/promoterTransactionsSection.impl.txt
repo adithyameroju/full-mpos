@@ -1,0 +1,421 @@
+const TXN_STATUS_BADGE={Available:"green",Pending:"orange",Withdrawn:"gray"};
+
+function PromoterTxnStatusPill({status}){
+  const M={
+    Credited:{bg:DS.color.green200,c:DS.color.green700},
+    Pending:{bg:DS.color.orange200,c:DS.color.orange700},
+    Reversed:{bg:DS.color.cerise200,c:DS.color.cerise700},
+    Withdrawn:{bg:DS.color.onyx200,c:DS.color.onyx600},
+  };
+  const v=M[status]||M.Credited;
+  return(
+    <span style={{display:"inline-flex",alignItems:"center",padding:"2px 8px",borderRadius:DS.radius.pill,background:v.bg,color:v.c,fontSize:10,fontWeight:600,fontFamily:DS.font}}>{status}</span>
+  );
+}
+
+function PromoterTransactionsSection({config,onNavigateToSell}){
+  const a=acc(config.domain);
+  const isEV=config.domain==="EV";
+  const navigate=useNavigate();
+  const [allRows,setAllRows]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [datePreset,setDatePreset]=useState("today");
+  const [customStart,setCustomStart]=useState(()=>new Date().toISOString().slice(0,10));
+  const [customEnd,setCustomEnd]=useState(()=>new Date().toISOString().slice(0,10));
+  const [customRangeOpen,setCustomRangeOpen]=useState(false);
+  const [draftStart,setDraftStart]=useState(()=>new Date().toISOString().slice(0,10));
+  const [draftEnd,setDraftEnd]=useState(()=>new Date().toISOString().slice(0,10));
+  const [filterOpen,setFilterOpen]=useState(false);
+  const [exportOpen,setExportOpen]=useState(false);
+  const [detailTxn,setDetailTxn]=useState(null);
+  const [toast,setToast]=useState(null);
+  const [appliedFilters,setAppliedFilters]=useState({status:"all",productType:"all",planType:"all",minCommission:"",maxCommission:""});
+  const [draftFilters,setDraftFilters]=useState({status:"all",productType:"all",planType:"all",minCommission:"",maxCommission:""});
+
+  useEffect(()=>{
+    let c=true;
+    setLoading(true);
+    fetchPromoterTransactions().then(r=>{
+      if(c) setAllRows(r);
+    }).finally(()=>{
+      if(c) setLoading(false);
+    });
+    return ()=>{ c=false; };
+  },[]);
+
+  const dateRange=useMemo(()=>computeDateRange(datePreset,customStart,customEnd),[datePreset,customStart,customEnd]);
+  const afterDate=useMemo(()=>filterByDateRange(allRows,dateRange),[allRows,dateRange]);
+  const filtered=useMemo(()=>applySheetFilters(afterDate,appliedFilters),[afterDate,appliedFilters]);
+  const sorted=useMemo(()=>[...filtered].sort((p,q)=>new Date(q.occurredAt)-new Date(p.occurredAt)),[filtered]);
+  const summary=useMemo(()=>computeSummary(sorted),[sorted]);
+
+  const customChipLabel=useMemo(()=>{
+    if(datePreset!=="custom") return null;
+    return formatCustomChipLabel(customStart,customEnd);
+  },[datePreset,customStart,customEnd]);
+
+  const activeFilterCount=useMemo(()=>{
+    let n=0;
+    if(appliedFilters.status!=="all") n++;
+    if(appliedFilters.productType!=="all") n++;
+    if(appliedFilters.planType!=="all") n++;
+    if(appliedFilters.minCommission.trim()!=="") n++;
+    if(appliedFilters.maxCommission.trim()!=="") n++;
+    return n;
+  },[appliedFilters]);
+
+  const chipPresets=[
+    {id:"today",label:"Today"},
+    {id:"this_week",label:"This week"},
+    {id:"this_month",label:"This month"},
+    {id:"last_month",label:"Last month"},
+    {id:"custom",label:customChipLabel||"Custom"},
+  ];
+
+  const openCustom=()=>{
+    setDraftStart(customStart);
+    setDraftEnd(customEnd);
+    setCustomRangeOpen(true);
+  };
+
+  const confirmCustom=()=>{
+    setCustomStart(draftStart);
+    setCustomEnd(draftEnd);
+    setDatePreset("custom");
+    setCustomRangeOpen(false);
+  };
+
+  const chipSelect=(id)=>{
+    if(id==="custom"){ openCustom(); return; }
+    setDatePreset(id);
+  };
+
+  const chipSel=(id)=>{
+    if(id==="custom") return datePreset==="custom";
+    return datePreset===id;
+  };
+
+  const chipFill=isEV?DS.color.green600:DS.color.purple600;
+
+  const rowAmount=(r)=>{
+    if(r.uiKind==="pending") return{main:`₹${r.pendingCommissionRupees.toLocaleString("en-IN")}`,color:PROMOTER_TXN_COLORS.AMBER,incl:false};
+    if(r.uiKind==="reversed") return{main:`−₹${Math.abs(r.netCreditedRupees).toLocaleString("en-IN")}`,color:PROMOTER_TXN_COLORS.RED,incl:false};
+    if(r.uiKind==="withdrawn") return{main:`+₹${r.netCreditedRupees.toLocaleString("en-IN")}`,color:PROMOTER_TXN_COLORS.TEAL,incl:r.tdsRupees>0};
+    return{main:`+₹${r.netCreditedRupees.toLocaleString("en-IN")}`,color:PROMOTER_TXN_COLORS.TEAL,incl:r.tdsRupees>0};
+  };
+
+  const downloadCsv=()=>{
+    const csv=buildCsv(sorted);
+    const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;
+    a.download=`transactions-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setToast({kind:"share",message:"Export ready — tap to share",blob:csv});
+    setExportOpen(false);
+  };
+
+  const openPdf=()=>{
+    const w=window.open("","_blank");
+    if(!w) return;
+    const rows=sorted.map(r=>{
+      const d=new Date(r.occurredAt);
+      return `<tr><td>${d.toLocaleDateString("en-IN")}</td><td>${r.deviceBrand} ${r.deviceModel}</td><td>${r.displayStatus}</td><td>₹${r.pendingCommissionRupees||r.netCreditedRupees}</td></tr>`;
+    }).join("");
+    w.document.write(`<!DOCTYPE html><html><head><title>Transactions</title><style>body{font-family:sans-serif} table{border-collapse:collapse;width:100%} td{border:1px solid #ddd;padding:6px;font-size:12px}</style></head><body><h2>Transactions</h2><table><thead><tr><th>Date</th><th>Device</th><th>Status</th><th>Amount</th></tr></thead><tbody>${rows}</tbody></table></body></html>`);
+    w.document.close();
+    w.focus();
+    w.print();
+    setTimeout(()=>w.close(),250);
+    setToast({kind:"share",message:"Export ready — tap to share",blob:null});
+    setExportOpen(false);
+  };
+
+  const shareToast=async ()=>{
+    if(!toast?.blob) return;
+    const file=new File([toast.blob],"transactions.csv",{type:"text/csv"});
+    try{
+      if(navigator.share&&navigator.canShare){ await navigator.share({files:[file],title:"Transactions"}); }
+    }catch{
+      /* ignore */
+    }
+    setToast(null);
+  };
+
+  useEffect(()=>{
+    if(!toast) return;
+    const t=setTimeout(()=>setToast(null),6000);
+    return ()=>clearTimeout(t);
+  },[toast]);
+
+  const copyPolicy=(pn)=>{
+    navigator.clipboard?.writeText(pn).catch(()=>{});
+  };
+
+  const bgSecondary=DS.color.onyx200;
+
+  return(
+    <div style={{position:"relative"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:DS.space[2]}}>
+        <div style={{fontFamily:DS.font,fontSize:13,fontWeight:500,color:DS.color.onyx800}}>My transactions</div>
+        <div style={{display:"flex",alignItems:"center",gap:DS.space[3]}}>
+          <div style={{position:"relative"}}>
+            <button type="button" className="abtn" onClick={()=>{ setDraftFilters({...appliedFilters}); setFilterOpen(true); }} aria-label="filter" style={{border:"none",background:DS.color.onyx200,cursor:"pointer",width:36,height:36,borderRadius:18,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>
+              <Filter size={18} strokeWidth={ICON_STROKE} color={DS.color.onyx700}/>
+            </button>
+            {activeFilterCount>0&&(
+              <span style={{position:"absolute",top:-2,right:-2,minWidth:16,height:16,borderRadius:8,background:DS.color.cerise600,color:"#fff",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:DS.font,padding:"0 4px"}}>{activeFilterCount}</span>
+            )}
+          </div>
+          <button type="button" className="abtn" onClick={()=>setExportOpen(true)} style={{border:"none",background:"none",cursor:"pointer",fontFamily:DS.font,fontSize:12,fontWeight:600,color:a.primary,padding:0}}>
+            Export →
+          </button>
+        </div>
+      </div>
+
+      <div style={{marginLeft:-DS.space[4],marginRight:-DS.space[4],marginBottom:DS.space[3]}}>
+        <div style={{display:"flex",gap:DS.space[2],overflowX:"auto",WebkitOverflowScrolling:"touch",paddingLeft:DS.space[4],paddingRight:DS.space[4],scrollbarWidth:"none"}}>
+          {chipPresets.map(ch=>{
+            const sel=chipSel(ch.id);
+            return(
+              <button
+                key={ch.id}
+                type="button"
+                className="abtn"
+                onClick={()=>chipSelect(ch.id)}
+                style={{
+                  flexShrink:0,
+                  padding:`8px 14px`,
+                  borderRadius:DS.radius.pill,
+                  border:sel?"none":`1px solid ${DS.color.onyx300}`,
+                  background:sel?chipFill:"transparent",
+                  color:sel?"#fff":DS.color.onyx600,
+                  fontFamily:DS.font,
+                  fontSize:12,
+                  fontWeight:600,
+                  cursor:"pointer",
+                  whiteSpace:"nowrap",
+                }}
+              >
+                {ch.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{background:bgSecondary,borderRadius:10,padding:"10px 0",display:"flex",marginBottom:DS.space[3]}}>
+        {[
+          {label:"Sales",value:String(summary.sales)},
+          {label:"Earned (net)",value:`₹${summary.earned.toLocaleString("en-IN")}`},
+          {label:"Pending",value:`₹${summary.pending.toLocaleString("en-IN")}`},
+        ].map((cell,i)=>(
+          <div key={cell.label} style={{flex:1,textAlign:"center",borderLeft:i>0?`0.5px solid ${DS.color.onyx300}`:"none"}}>
+            <div style={{fontFamily:DS.font,fontSize:10,color:DS.color.onyx500,marginBottom:2}}>{cell.label}</div>
+            <div className="counter" style={{fontFamily:DS.font,fontSize:16,fontWeight:500,color:DS.color.onyx800}}>{cell.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {loading?(
+        <Card style={{padding:DS.space[4],display:"flex",alignItems:"center",gap:DS.space[2]}}>
+          <Loader2 size={18} strokeWidth={ICON_STROKE} color={DS.color.onyx500} style={{animation:"mpos-spin 0.9s linear infinite"}} aria-hidden />
+          <span style={{fontFamily:DS.font,fontSize:13,color:DS.color.onyx500}}>Loading…</span>
+        </Card>
+      ):sorted.length===0?(
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",padding:`${DS.space[6]}px ${DS.space[2]}px`,textAlign:"center"}}>
+          <Receipt size={40} strokeWidth={1.25} color={DS.color.onyx400} aria-hidden style={{marginBottom:DS.space[3]}} />
+          <div style={{fontFamily:DS.font,fontSize:14,fontWeight:500,color:DS.color.onyx800,marginBottom:DS.space[2]}}>No sales in this period</div>
+          <div style={{fontFamily:DS.font,fontSize:12,color:DS.color.onyx500,maxWidth:280,lineHeight:1.5}}>Your transactions will appear here as you sell.</div>
+          {datePreset==="today"&&(
+            <div style={{marginTop:DS.space[4]}}>
+              <div style={{fontFamily:DS.font,fontSize:12,color:DS.color.onyx600,marginBottom:DS.space[2]}}>Tap the Sell button to start earning</div>
+              <Btn variant={isEV?"primaryEV":"primary"} full style={{background:chipFill}} onClick={()=>onNavigateToSell?.()}>Sell policy →</Btn>
+            </div>
+          )}
+        </div>
+      ):(
+        <div style={{borderTop:`0.5px solid ${DS.color.onyx300}`}}>
+          {sorted.map(r=>{
+            const am=rowAmount(r);
+            return(
+              <button
+                key={r.id}
+                type="button"
+                className="abtn"
+                onClick={()=>setDetailTxn(r)}
+                style={{
+                  width:"100%",
+                  textAlign:"left",
+                  border:"none",
+                  borderBottom:`0.5px solid ${DS.color.onyx300}`,
+                  background:"transparent",
+                  cursor:"pointer",
+                  padding:`${DS.space[3]}px 0`,
+                  minHeight:64,
+                  display:"flex",
+                  justifyContent:"space-between",
+                  gap:DS.space[3],
+                  fontFamily:DS.font,
+                  boxSizing:"border-box",
+                }}
+              >
+                <div style={{minWidth:0,flex:1}}>
+                  <div style={{fontSize:12,fontWeight:500,color:DS.color.onyx800,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.deviceBrand} {r.deviceModel}</div>
+                  <div style={{fontSize:11,color:DS.color.onyx500,marginTop:2}}>{r.planCode} · {r.tenureLabel}</div>
+                  <div style={{fontSize:10,color:DS.color.onyx400,marginTop:2}}>{formatTxnRowDateTime(r.occurredAt)}</div>
+                </div>
+                <div style={{textAlign:"right",flexShrink:0}}>
+                  <div className="counter" style={{fontSize:13,fontWeight:500,color:am.color}}>{am.main}</div>
+                  {am.incl&&<div style={{fontSize:9,color:DS.color.onyx400,marginTop:2}}>incl. TDS</div>}
+                  <div style={{marginTop:4}}><PromoterTxnStatusPill status={r.displayStatus}/></div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {customRangeOpen&&(
+        <div role="presentation" style={{position:"fixed",inset:0,zIndex:80,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setCustomRangeOpen(false)}>
+          <div role="dialog" onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:360,maxHeight:"70%",background:DS.color.onyx100,borderTopLeftRadius:DS.radius.xl,borderTopRightRadius:DS.radius.xl,padding:DS.space[4],boxShadow:"0 -8px 32px rgba(0,0,0,0.2)"}}>
+            <div style={{fontFamily:DS.font,fontSize:16,fontWeight:600,marginBottom:DS.space[3]}}>Date range</div>
+            <div style={{marginBottom:DS.space[2]}}>
+              <div style={{fontSize:11,fontWeight:600,color:DS.color.onyx500,marginBottom:4}}>Start</div>
+              <input type="date" value={draftStart} onChange={e=>setDraftStart(e.target.value)} style={{width:"100%",height:40,borderRadius:DS.radius.lg,border:`1px solid ${DS.color.onyx300}`,fontFamily:DS.font,padding:`0 ${DS.space[2]}px`}} />
+            </div>
+            <div style={{marginBottom:DS.space[4]}}>
+              <div style={{fontSize:11,fontWeight:600,color:DS.color.onyx500,marginBottom:4}}>End</div>
+              <input type="date" value={draftEnd} onChange={e=>setDraftEnd(e.target.value)} style={{width:"100%",height:40,borderRadius:DS.radius.lg,border:`1px solid ${DS.color.onyx300}`,fontFamily:DS.font,padding:`0 ${DS.space[2]}px`}} />
+            </div>
+            <Btn variant={isEV?"primaryEV":"primary"} full style={{background:chipFill}} onClick={confirmCustom}>Confirm</Btn>
+          </div>
+        </div>
+      )}
+
+      {filterOpen&&(
+        <div role="presentation" style={{position:"fixed",inset:0,zIndex:80,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setFilterOpen(false)}>
+          <div role="dialog" onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:360,maxHeight:"78%",background:DS.color.onyx100,borderTopLeftRadius:DS.radius.xl,borderTopRightRadius:DS.radius.xl,padding:DS.space[4],overflowY:"auto"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:DS.space[3]}}>
+              <span style={{fontFamily:DS.font,fontSize:16,fontWeight:600}}>Filters</span>
+              <button type="button" className="abtn" onClick={()=>setFilterOpen(false)} style={{border:"none",background:"none",cursor:"pointer",padding:DS.space[2]}} aria-label="Close"><X size={22} strokeWidth={ICON_STROKE} color={DS.color.onyx500}/></button>
+            </div>
+            <div style={{fontSize:11,fontWeight:600,color:DS.color.onyx500,marginBottom:DS.space[2]}}>Status</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:DS.space[2],marginBottom:DS.space[4]}}>
+              {["All","Credited","Pending","Reversed"].map(v=>{
+                const id=v==="All"?"all":v;
+                const sel=draftFilters.status===id;
+                return(
+                  <button key={v} type="button" className="abtn" onClick={()=>setDraftFilters(f=>({...f,status:id}))} style={{padding:`6px 12px`,borderRadius:DS.radius.pill,border:sel?"none":`1px solid ${DS.color.onyx300}`,background:sel?chipFill:"transparent",color:sel?"#fff":DS.color.onyx600,fontFamily:DS.font,fontSize:11,fontWeight:600,cursor:"pointer"}}>{v}</button>
+                );
+              })}
+            </div>
+            <div style={{fontSize:11,fontWeight:600,color:DS.color.onyx500,marginBottom:DS.space[2]}}>Product type</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:DS.space[2],marginBottom:DS.space[4]}}>
+              {["All","Electronics","EV","White Goods"].map(v=>{
+                const id=v==="All"?"all":v;
+                const sel=draftFilters.productType===id;
+                return(
+                  <button key={v} type="button" className="abtn" onClick={()=>setDraftFilters(f=>({...f,productType:id}))} style={{padding:`6px 12px`,borderRadius:DS.radius.pill,border:sel?"none":`1px solid ${DS.color.onyx300}`,background:sel?chipFill:"transparent",color:sel?"#fff":DS.color.onyx600,fontFamily:DS.font,fontSize:11,fontWeight:600,cursor:"pointer"}}>{v}</button>
+                );
+              })}
+            </div>
+            <div style={{fontSize:11,fontWeight:600,color:DS.color.onyx500,marginBottom:DS.space[2]}}>Plan type</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:DS.space[2],marginBottom:DS.space[4]}}>
+              {["All","ALD","EW","Total Protection"].map(v=>{
+                const id=v==="All"?"all":v;
+                const sel=draftFilters.planType===id;
+                return(
+                  <button key={v} type="button" className="abtn" onClick={()=>setDraftFilters(f=>({...f,planType:id}))} style={{padding:`6px 12px`,borderRadius:DS.radius.pill,border:sel?"none":`1px solid ${DS.color.onyx300}`,background:sel?chipFill:"transparent",color:sel?"#fff":DS.color.onyx600,fontFamily:DS.font,fontSize:11,fontWeight:600,cursor:"pointer"}}>{v}</button>
+                );
+              })}
+            </div>
+            <div style={{fontSize:11,fontWeight:600,color:DS.color.onyx500,marginBottom:DS.space[2]}}>Commission range (₹)</div>
+            <div style={{display:"flex",gap:DS.space[2],marginBottom:DS.space[4]}}>
+              <input type="number" inputMode="numeric" placeholder="Min ₹" value={draftFilters.minCommission} onChange={e=>setDraftFilters(f=>({...f,minCommission:e.target.value}))} style={{flex:1,height:40,borderRadius:DS.radius.lg,border:`1px solid ${DS.color.onyx300}`,fontFamily:DS.font,fontSize:13,padding:`0 ${DS.space[2]}px`}} />
+              <input type="number" inputMode="numeric" placeholder="Max ₹" value={draftFilters.maxCommission} onChange={e=>setDraftFilters(f=>({...f,maxCommission:e.target.value}))} style={{flex:1,height:40,borderRadius:DS.radius.lg,border:`1px solid ${DS.color.onyx300}`,fontFamily:DS.font,fontSize:13,padding:`0 ${DS.space[2]}px`}} />
+            </div>
+            <Btn variant={isEV?"primaryEV":"primary"} full style={{background:chipFill}} onClick={()=>{ setAppliedFilters({...draftFilters}); setFilterOpen(false); }}>Apply filters</Btn>
+            <button type="button" className="abtn" onClick={()=>{ const z={status:"all",productType:"all",planType:"all",minCommission:"",maxCommission:""}; setDraftFilters(z); setAppliedFilters(z); }} style={{border:"none",background:"none",cursor:"pointer",padding:DS.space[3],marginTop:DS.space[2],width:"100%",fontFamily:DS.font,fontSize:13,fontWeight:600,color:DS.color.onyx500}}>Reset all</button>
+          </div>
+        </div>
+      )}
+
+      {exportOpen&&(
+        <div role="presentation" style={{position:"fixed",inset:0,zIndex:80,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center",padding:DS.space[4]}} onClick={()=>setExportOpen(false)}>
+          <div role="dialog" onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:280,background:DS.color.onyx100,borderRadius:DS.radius.xl,padding:DS.space[3],boxShadow:"0 8px 32px rgba(0,0,0,0.2)"}}>
+            <button type="button" className="abtn" onClick={downloadCsv} style={{width:"100%",textAlign:"left",padding:DS.space[3],border:"none",background:"none",cursor:"pointer",fontFamily:DS.font,fontSize:14,fontWeight:600,color:DS.color.onyx800}}>Export as CSV</button>
+            <button type="button" className="abtn" onClick={openPdf} style={{width:"100%",textAlign:"left",padding:DS.space[3],border:"none",background:"none",cursor:"pointer",fontFamily:DS.font,fontSize:14,fontWeight:600,color:DS.color.onyx800}}>Share as PDF</button>
+          </div>
+        </div>
+      )}
+
+      {detailTxn&&(
+        <div role="presentation" style={{position:"fixed",inset:0,zIndex:80,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setDetailTxn(null)}>
+          <div role="dialog" onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:360,maxHeight:"70vh",background:DS.color.onyx100,borderTopLeftRadius:DS.radius.xl,borderTopRightRadius:DS.radius.xl,padding:DS.space[4],overflowY:"auto"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:DS.space[3]}}>
+              <span style={{fontFamily:DS.font,fontSize:16,fontWeight:600}}>Transaction</span>
+              <button type="button" className="abtn" onClick={()=>setDetailTxn(null)} style={{border:"none",background:"none",cursor:"pointer",padding:DS.space[2]}} aria-label="Close"><X size={22} strokeWidth={ICON_STROKE} color={DS.color.onyx500}/></button>
+            </div>
+            <div style={{fontFamily:DS.font,fontSize:16,fontWeight:500,color:DS.color.onyx800,marginBottom:DS.space[2]}}>{detailTxn.deviceBrand} {detailTxn.deviceModel}</div>
+            <div style={{display:"flex",alignItems:"center",gap:DS.space[2],marginBottom:DS.space[2]}}>
+              <span style={{fontFamily:"ui-monospace,monospace",fontSize:12,color:DS.color.onyx500}}>{detailTxn.policyNumber}</span>
+              <button type="button" className="abtn" onClick={()=>copyPolicy(detailTxn.policyNumber)} aria-label="Copy policy number" style={{border:"none",background:"none",cursor:"pointer",padding:DS.space[1]}}><Copy size={16} strokeWidth={ICON_STROKE} color={DS.color.onyx500}/></button>
+            </div>
+            <div style={{fontSize:12,color:DS.color.onyx500,marginBottom:DS.space[4]}}>{formatTxnRowDateTime(detailTxn.occurredAt)}</div>
+
+            <div style={{fontSize:12,fontWeight:600,color:DS.color.onyx800,marginBottom:DS.space[2]}}>Commission breakdown</div>
+            <div style={{border:`1px solid ${DS.color.onyx300}`,borderRadius:DS.radius.lg,padding:DS.space[3],marginBottom:DS.space[3]}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:DS.space[2]}}><span>Base commission</span><span className="counter">₹{detailTxn.baseCommissionRupees}</span></div>
+              {detailTxn.schemeBonusRupees>0&&(
+                <div style={{marginBottom:DS.space[2]}}>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:13}}><span>Scheme bonus</span><span className="counter">₹{detailTxn.schemeBonusRupees}</span></div>
+                  {detailTxn.schemeName&&<div style={{fontSize:10,color:DS.color.onyx500}}>{detailTxn.schemeName}</div>}
+                </div>
+              )}
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:DS.space[2],color:DS.color.cerise700}}><span>TDS deducted</span><span className="counter">−₹{detailTxn.tdsRupees}</span></div>
+              <div style={{borderTop:`1px solid ${DS.color.onyx300}`,paddingTop:DS.space[2],display:"flex",justifyContent:"space-between",fontSize:14,fontWeight:700,color:PROMOTER_TXN_COLORS.TEAL}}><span>Net credited</span><span className="counter">₹{detailTxn.uiKind==="pending"?0:detailTxn.netCreditedRupees}</span></div>
+            </div>
+
+            <div style={{fontSize:12,fontWeight:600,marginBottom:DS.space[2]}}>Status</div>
+            <div style={{display:"flex",gap:DS.space[2],marginBottom:DS.space[3],flexWrap:"wrap"}}>
+              {["Earned","Approved","Encashed","Reversed"].map((step,i)=>{
+                const rev=step==="Reversed";
+                if(rev&&!detailTxn.smReversed) return null;
+                const done=step==="Earned"?detailTxn.smEarned:step==="Approved"?detailTxn.smApproved:step==="Encashed"?detailTxn.smEncashed:detailTxn.smReversed;
+                return(
+                  <div key={step} style={{display:"flex",alignItems:"center",gap:4}}>
+                    <div style={{width:10,height:10,borderRadius:5,background:done?chipFill:DS.color.onyx300}}/>
+                    <span style={{fontSize:11,color:done?DS.color.onyx800:DS.color.onyx400}}>{step}</span>
+                  </div>
+                );
+              })}
+            </div>
+            {detailTxn.smReversed&&detailTxn.reversalReason&&(
+              <div style={{fontSize:12,color:DS.color.cerise700,background:DS.color.cerise100,padding:DS.space[2],borderRadius:DS.radius.md,marginBottom:DS.space[3]}}>{detailTxn.reversalReason}</div>
+            )}
+
+            <div style={{fontSize:12,fontWeight:600,marginBottom:DS.space[2]}}>Plan details</div>
+            <div style={{fontSize:13,color:DS.color.onyx700,marginBottom:DS.space[1]}}>{detailTxn.planCode} · {detailTxn.tenureLabel} · Premium ₹{detailTxn.premiumRupees.toLocaleString("en-IN")}</div>
+            <div style={{fontSize:12,color:DS.color.onyx500,marginBottom:DS.space[2]}}>{detailTxn.coverageSummary}</div>
+            <div style={{fontSize:12,color:DS.color.onyx600,marginBottom:DS.space[4]}}>Customer: {detailTxn.customerNameMask}</div>
+
+            {detailTxn.uiKind==="reversed"&&(
+              <div style={{fontSize:12,color:DS.color.onyx500,marginBottom:DS.space[3]}}>Negative balance note — will offset against future earnings</div>
+            )}
+            <button type="button" className="abtn" onClick={()=>{ setDetailTxn(null); }} style={{border:"none",background:"none",cursor:"pointer",fontFamily:DS.font,fontSize:13,fontWeight:600,color:a.primary,padding:0}}>View policy →</button>
+          </div>
+        </div>
+      )}
+
+      {toast&&(
+        <button type="button" className="abtn" onClick={shareToast} style={{position:"fixed",bottom:DS.space[6],left:"50%",transform:"translateX(-50%)",width:"min(360px, calc(100vw - 32px))",zIndex:90,background:DS.color.onyx800,color:"#fff",border:"none",borderRadius:DS.radius.lg,padding:`${DS.space[3]}px ${DS.space[4]}px`,fontFamily:DS.font,fontSize:13,fontWeight:600,display:"flex",alignItems:"center",justifyContent:"center",gap:DS.space[2],cursor:"pointer",boxShadow:"0 8px 24px rgba(0,0,0,0.25)"}}>
+          <Share2 size={16} strokeWidth={ICON_STROKE} color="#fff" aria-hidden />
+          {toast.message}
+        </button>
+      )}
+    </div>
+  );
+}
