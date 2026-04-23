@@ -90,8 +90,12 @@ const acc = (domain) => domain==="EV"
   : {primary:DS.color.purple600,dark:DS.color.purple700,light:DS.color.purple100,mid:DS.color.purple200,text:DS.color.purple800};
 
 const PARTNERS={Electronics:["Xiaomi","Oppo","LFR","GT","Bajaj Finance"],EV:["Hero Vida","Ather Energy"]};
+function withPublicPath(rel){
+  const path=(rel.startsWith("/")?rel.slice(1):rel);
+  return `${import.meta.env.BASE_URL}${path}`;
+}
 const PARTNER_LOGO_LOCAL_OVERRIDES={
-  Xiaomi:"/partners/xiaomi.svg",
+  Xiaomi:withPublicPath("/partners/xiaomi.svg"),
 };
 const PARTNER_LOGO_DOMAINS={
   Oppo:"oppo.com",
@@ -3423,7 +3427,7 @@ const SELL_DEVICE_ELECTRONICS={
   serial:"SN-X14-IN-88421",
   invoiceDate:"12 Mar 2025",
   oem:"Xiaomi India",
-  imageUrl:"/sell/eligibility-phone.svg",
+  imageUrl:withPublicPath("/sell/eligibility-phone.svg"),
 };
 const SELL_DEVICE_EV={
   model:"Hero Vida V2",
@@ -3432,7 +3436,7 @@ const SELL_DEVICE_EV={
   serial:"—",
   invoiceDate:"8 Mar 2025",
   oem:"Hero MotoCorp",
-  imageUrl:"/sell/eligibility-ev.svg",
+  imageUrl:withPublicPath("/sell/eligibility-ev.svg"),
 };
 
 const SELL_PLANS_ELECTRONICS=[
