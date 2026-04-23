@@ -52,6 +52,7 @@ import {
   Search,
   Share2,
   ShieldAlert,
+  SlidersHorizontal,
   ClipboardList,
   Sparkles,
   ScanBarcode,
@@ -4903,7 +4904,7 @@ function MoreScreen({config,kycSkipped,withdrawalStatus,onDismissWithdrawal}){
 }
 
 // ── Phone Frame ───────────────────────────────────────────────────────────────
-function PhoneFrame({config,activeTab,onNavTab,frameWidth=360,kycSkipped,setKycSkipped,onboardingDone,setOnboardingDone,promoterLoggedIn,setPromoterLoggedIn,promoterFirstLoginComplete,setPromoterFirstLoginComplete,dealerLoggedIn,setDealerLoggedIn,dealerFirstLoginComplete,setDealerFirstLoginComplete,withdrawalStatus,setWithdrawalStatus}){
+function PhoneFrame({config,activeTab,onNavTab,frameWidth=393,kycSkipped,setKycSkipped,onboardingDone,setOnboardingDone,promoterLoggedIn,setPromoterLoggedIn,promoterFirstLoginComplete,setPromoterFirstLoginComplete,dealerLoggedIn,setDealerLoggedIn,dealerFirstLoginComplete,setDealerFirstLoginComplete,withdrawalStatus,setWithdrawalStatus}){
   const a=acc(config.domain);
   const navigate=useNavigate();
   const location=useLocation();
@@ -4937,8 +4938,67 @@ function PhoneFrame({config,activeTab,onNavTab,frameWidth=360,kycSkipped,setKycS
   const showSchemesDetailHeader=!showOnboarding&&!showPersonaFirstRunSetup&&isSchemesDetailRoute&&!profileOpen;
   const showSchemesListHeader=!showOnboarding&&!showPersonaFirstRunSetup&&isSchemesListRoute&&!profileOpen;
   const screenTitle={home:config.persona==="Promoter"?"Dashboard":"Good morning, Arjun",sell:"New sale",earnings:"My earnings",team:"Team"};
+  const isTabletFrame=frameWidth>=600;
+  const screenHeight=isTabletFrame?"min(82vh, 900px)":"min(88vh, 940px)";
+  const outerRadius=isTabletFrame?36:54;
+  const innerRadius=isTabletFrame?28:44;
   return(
-    <div style={{width:frameWidth,flexShrink:0,background:DS.color.onyx100,borderRadius:40,border:"8px solid #252525",overflow:"hidden",display:"flex",flexDirection:"column",height:700,boxShadow:"0 24px 80px rgba(0,0,0,0.65)"}}>
+    <div
+      style={{
+        flexShrink:0,
+        position:"relative",
+        filter:"drop-shadow(0 40px 80px rgba(0,0,0,0.55)) drop-shadow(0 12px 24px rgba(0,0,0,0.35))",
+      }}
+    >
+      <div
+        aria-hidden
+        style={{
+          position:"absolute",
+          right:-3,
+          top:120,
+          width:4,
+          height:56,
+          borderRadius:2,
+          background:"linear-gradient(180deg,#3d3d40,#1f1f21)",
+          boxShadow:"inset 0 0 0 1px rgba(255,255,255,0.06)",
+          opacity:isTabletFrame?0:0.95,
+        }}
+      />
+      <div
+        aria-hidden
+        style={{
+          position:"absolute",
+          right:-3,
+          top:186,
+          width:4,
+          height:56,
+          borderRadius:2,
+          background:"linear-gradient(180deg,#3d3d40,#1f1f21)",
+          boxShadow:"inset 0 0 0 1px rgba(255,255,255,0.06)",
+          opacity:isTabletFrame?0:0.95,
+        }}
+      />
+      <div
+        style={{
+          borderRadius:outerRadius,
+          padding:isTabletFrame?10:14,
+          background:"linear-gradient(155deg,#5c5c60 0%,#2a2a2c 18%,#121214 52%,#242426 88%,#3a3a3e 100%)",
+          boxShadow:"inset 0 2px 3px rgba(255,255,255,0.14), inset 0 -2px 6px rgba(0,0,0,0.45)",
+        }}
+      >
+        <div
+          style={{
+            position:"relative",
+            width:frameWidth,
+            height:screenHeight,
+            borderRadius:innerRadius,
+            overflow:"hidden",
+            display:"flex",
+            flexDirection:"column",
+            background:DS.color.onyx100,
+            boxShadow:"inset 0 0 0 1px rgba(255,255,255,0.06)",
+          }}
+        >
       <div style={{background:a.primary,padding:`10px ${DS.space[5]}px 8px`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <span style={{fontFamily:DS.font,fontSize:12,fontWeight:500,color:"#fff"}}>9:41</span>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -5226,6 +5286,8 @@ function PhoneFrame({config,activeTab,onNavTab,frameWidth=360,kycSkipped,setKycS
         }
       </div>
       {!showOnboarding&&!showPersonaFirstRunSetup&&!workflowFullBleed&&<NavBar active={isSchemesListRoute?null:activeTab} onNav={id=>{setProfileOpen(false);onNavTab(id);}} domain={config.domain}/>}
+        </div>
+      </div>
     </div>
   );
 }
@@ -5261,7 +5323,7 @@ function ControlPanel({
   });
   const errorOptionsStep2=getErrorOptionsForConfig(simulatedConfig);
   return(
-    <div style={{width:228,flexShrink:0,background:"#141414",border:"1px solid rgba(255,255,255,0.1)",borderRadius:DS.radius.xl,padding:DS.space[4],overflowY:"auto",height:700,boxSizing:"border-box"}}>
+    <div style={{width:300,flexShrink:0,background:"#141414",border:"1px solid rgba(255,255,255,0.12)",borderRadius:18,padding:DS.space[5],overflowY:"auto",maxHeight:"min(72vh, 720px)",height:"auto",boxSizing:"border-box",boxShadow:"0 24px 64px rgba(0,0,0,0.55)"}}>
       <div style={{fontFamily:DS.font,fontSize:14,fontWeight:600,color:"rgba(255,255,255,0.95)",marginBottom:DS.space[1]}}>Simulator controls</div>
       <div style={{marginBottom:DS.space[4]}}>
         <div style={{fontFamily:DS.font,fontSize:11,fontWeight:600,color:"rgba(255,255,255,0.5)",marginBottom:DS.space[2],letterSpacing:"0.2px"}}>Device</div>
@@ -5283,7 +5345,7 @@ function ControlPanel({
               color:deviceMode==="mobile"?"#fff":"rgba(255,255,255,0.55)",
             }}
           >
-            Mobile · 360px
+            Mobile · 393px
           </button>
           <button
             type="button"
@@ -5402,7 +5464,17 @@ export default function MPOSSimulator(){
   const [dealerFirstLoginComplete,setDealerFirstLoginComplete]=useState(true);
   const [withdrawalStatus,setWithdrawalStatus]=useState(null);
   const [deviceMode,setDeviceMode]=useState("mobile");
-  const frameWidth=deviceMode==="tablet"?1024:360;
+  const [simControlsOpen,setSimControlsOpen]=useState(false);
+  const frameWidth=deviceMode==="tablet"?1024:393;
+
+  useEffect(()=>{
+    if(!simControlsOpen) return undefined;
+    const onKey=e=>{
+      if(e.key==="Escape") setSimControlsOpen(false);
+    };
+    window.addEventListener("keydown",onKey);
+    return()=>window.removeEventListener("keydown",onKey);
+  },[simControlsOpen]);
 
   useEffect(()=>{
     const tabMap={"Sell":"sell","File claim":"sell","Check earnings":"earnings","Manage team":"team","Onboarding":"home"};
@@ -5491,38 +5563,96 @@ export default function MPOSSimulator(){
   return(
     <>
       <style>{fontCSS}</style>
-      <div style={{display:"flex",gap:DS.space[6],padding:DS.space[6],alignItems:"flex-start",justifyContent:"flex-start",background:"#0a0a0a",minHeight:"100vh",width:"100%",overflowX:"auto",fontFamily:DS.font,boxSizing:"border-box"}}>
-        <ControlPanel
-          controlStep={controlStep}
-          draftBasic={draftBasic}
-          onDraftBasicChange={handleDraftBasicChange}
-          simulatedConfig={simulatedConfig}
-          onSimulatedContextChange={handleSimulatedContextChange}
-          onSimulate={handleSimulate}
-          onBackStep2={handleBackToBasic}
-          deviceMode={deviceMode}
-          onDeviceModeChange={setDeviceMode}
-        />
-        <PhoneFrame
-          config={simulatedConfig}
-          activeTab={activeTab}
-          onNavTab={handleNavTab}
-          frameWidth={frameWidth}
-          kycSkipped={kycSkipped}
-          setKycSkipped={setKycSkipped}
-          onboardingDone={onboardingDone}
-          setOnboardingDone={setOnboardingDone}
-          promoterLoggedIn={promoterLoggedIn}
-          setPromoterLoggedIn={setPromoterLoggedIn}
-          promoterFirstLoginComplete={promoterFirstLoginComplete}
-          setPromoterFirstLoginComplete={setPromoterFirstLoginComplete}
-          dealerLoggedIn={dealerLoggedIn}
-          setDealerLoggedIn={setDealerLoggedIn}
-          dealerFirstLoginComplete={dealerFirstLoginComplete}
-          setDealerFirstLoginComplete={setDealerFirstLoginComplete}
-          withdrawalStatus={withdrawalStatus}
-          setWithdrawalStatus={setWithdrawalStatus}
-        />
+      <div style={{minHeight:"100vh",width:"100%",background:"#0a0a0a",display:"flex",alignItems:"center",justifyContent:"center",padding:`${DS.space[8]}px ${DS.space[6]}px`,boxSizing:"border-box",overflow:"auto",fontFamily:DS.font,position:"relative"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",width:"100%",maxWidth:"100%"}}>
+          <PhoneFrame
+            config={simulatedConfig}
+            activeTab={activeTab}
+            onNavTab={handleNavTab}
+            frameWidth={frameWidth}
+            kycSkipped={kycSkipped}
+            setKycSkipped={setKycSkipped}
+            onboardingDone={onboardingDone}
+            setOnboardingDone={setOnboardingDone}
+            promoterLoggedIn={promoterLoggedIn}
+            setPromoterLoggedIn={setPromoterLoggedIn}
+            promoterFirstLoginComplete={promoterFirstLoginComplete}
+            setPromoterFirstLoginComplete={setPromoterFirstLoginComplete}
+            dealerLoggedIn={dealerLoggedIn}
+            setDealerLoggedIn={setDealerLoggedIn}
+            dealerFirstLoginComplete={dealerFirstLoginComplete}
+            setDealerFirstLoginComplete={setDealerFirstLoginComplete}
+            withdrawalStatus={withdrawalStatus}
+            setWithdrawalStatus={setWithdrawalStatus}
+          />
+        </div>
+        <button
+          type="button"
+          className="abtn"
+          aria-label={simControlsOpen?"Close simulator controls":"Open simulator controls"}
+          aria-expanded={simControlsOpen}
+          onClick={()=>setSimControlsOpen((o)=>!o)}
+          style={{
+            position:"fixed",
+            left:24,
+            bottom:24,
+            zIndex:120,
+            width:56,
+            height:56,
+            borderRadius:28,
+            border:"none",
+            cursor:"pointer",
+            display:"flex",
+            alignItems:"center",
+            justifyContent:"center",
+            background:"linear-gradient(145deg,#6B4BD6,#4E29BB)",
+            color:"#fff",
+            boxShadow:"0 10px 28px rgba(78,41,187,0.45), 0 2px 8px rgba(0,0,0,0.35)",
+            touchAction:"manipulation",
+          }}
+        >
+          <SlidersHorizontal size={26} strokeWidth={2} aria-hidden />
+        </button>
+        {simControlsOpen&&(
+          <>
+            <button
+              type="button"
+              aria-label="Dismiss simulator controls"
+              onClick={()=>setSimControlsOpen(false)}
+              style={{
+                position:"fixed",
+                inset:0,
+                zIndex:110,
+                border:"none",
+                padding:0,
+                margin:0,
+                background:"rgba(0,0,0,0.45)",
+                cursor:"pointer",
+              }}
+            />
+            <div
+              style={{
+                position:"fixed",
+                left:20,
+                bottom:96,
+                zIndex:115,
+                maxWidth:"calc(100vw - 40px)",
+              }}
+            >
+              <ControlPanel
+                controlStep={controlStep}
+                draftBasic={draftBasic}
+                onDraftBasicChange={handleDraftBasicChange}
+                simulatedConfig={simulatedConfig}
+                onSimulatedContextChange={handleSimulatedContextChange}
+                onSimulate={handleSimulate}
+                onBackStep2={handleBackToBasic}
+                deviceMode={deviceMode}
+                onDeviceModeChange={setDeviceMode}
+              />
+            </div>
+          </>
+        )}
       </div>
     </>
   );
